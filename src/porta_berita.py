@@ -9,7 +9,7 @@ class Login(SeleniumDriver):
         self.driver = driver
 
     ######################################
-    # Locato    r
+    # Locator
     ######################################
     _id_user_login = "user_login"
     _id_user_pas = "user_pass"
@@ -34,6 +34,8 @@ class Login(SeleniumDriver):
         self.enter_password(password)
         self.submit()
 
+    def get_driver(self):
+        return self.driver
 
 class Template(SeleniumDriver):
 

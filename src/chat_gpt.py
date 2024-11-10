@@ -4,8 +4,8 @@ from botasaurus.user_agent import UserAgent
 from botasaurus.window_size import WindowSize
 import time
 
-q = Queue()  # Queue untuk menyimpan driver
 HIT_BUTTON_SEND_PROMPT = 0  # Counter global untuk tracking prompt
+DRIVER = None
 
 
 def inject_text_with_js(driver: Driver, text: str):
@@ -20,12 +20,11 @@ def send_prompt(driver: Driver, prompt: str):
     """Mengirim prompt dengan injeksi JavaScript."""
     global HIT_BUTTON_SEND_PROMPT
 
-    default_prompt = """Parafrasekan [artikel lama] ini dan gunakan kalimat aktif dan kalimat pendek untuk membuat konten lebih mudah dibaca oleh semua kalangan
-    agar artikel lebih menarik, tanpa ada pengurangan maksud kata dan arti inti dari artikel sebelum nya\n\n dan buatkan struktur ulang untuk kepentingan SEO \n\n buaatkan hasil nya menjadi struktur html SEMATIC dan hanya kode html """
+    default_prompt = """kamu adalah seorang ahli seo dan copywriting, saat ini kamu sedang melakukan paraphrasing dari  beberapa webiste berita lokal dan manca negara untuk situs berita mu sendiri. dibawah ini adalah hasil scraping dari webiste berita orang lain dengan format .json paraphrasing bagian content dengan bahasa yang baik menurut SEO, jadikan output nya dengan bentuk .json tanpa ada noise teks tambahan, penjelasan dan sejenis nya"""
 
     full_prompt = f"{default_prompt} {prompt}"
 
-    driver.wait_for_element("div[id='prompt-textarea']", Wait.LONG)
+    driver.wait_for_element("div[id='prompt-textarea']", wait=60)
 
     # Inject teks langsung ke input prompt
     inject_text_with_js(driver, full_prompt)
@@ -38,16 +37,22 @@ def send_prompt(driver: Driver, prompt: str):
 
 
 def get_response(driver: Driver, prompt: str) -> str:
-    """Mengambil respons terakhir dari ChatGPT."""
+    """Mengambil respons terakhir dari ChatGPT dengan timeout."""
     send_prompt(driver, prompt)
 
-    while True:
+    start_time = time.time()
+    timeout = 10  # Timeout dalam detik
+
+    while time.time() - start_time < timeout:
         # Cek apakah tombol 'Copy' sudah muncul, berarti respons siap
-        buttons = driver.select_all("button[aria-label='Copy']", Wait.LONG)
-        if len(buttons) >= HIT_BUTTON_SEND_PROMPT:
-            responses = driver.select_all(".markdown", Wait.SHORT)
-            response_text = responses[-1].text  # Ambil respons terakhir
-            return response_text  # Kembalikan respons
+        buttons = driver.select_all("button[aria-label='Copy']", Wait.VERY_LONG)
+        responses = driver.select_all(".markdown", Wait.VERY_LONG)
+        response_text = responses[-1].text  # Ambil respons terakhir
+        return response_text  # Kembalikan respons
+        time.sleep(1)  # Tambahkan jeda agar tidak terlalu cepat
+    print("[Error]: Respons ChatGPT timeout.")
+    time.sleep(3500)
+    return ""
 
 
 @browser(
@@ -55,16 +60,13 @@ def get_response(driver: Driver, prompt: str) -> str:
     close_on_crash=True,
     user_agent=UserAgent.HASHED,
     window_size=WindowSize.HASHED,
+    output=None,
 )
 def open_chatgpt(driver: Driver, data={}):
     """Membuka halaman ChatGPT dan menambahkan driver ke antrian (queue)."""
-    driver.google_get("https://chatgpt.com/")
-    q.put(driver)  # Tambahkan driver ke queue
-
-
-def get_driver() -> Driver:
-    """Mengambil driver dari queue."""
-    return q.get()
+    driver.google_get("https://chatgpt.com/", bypass_cloudflare=True)
+    global DRIVER
+    DRIVER = driver
 
 
 def check_popup(driver: Driver):
@@ -76,38 +78,17 @@ def check_popup(driver: Driver):
         )
         if result:
             result.click()
-            print("[*] Popup terdeteksi dan diklik.")
     except:
-        print("[*] Tidak ada popup yang muncul.")
+        pass
 
 
 def runAI(prompts):
     """Jalankan penerjemahan untuk setiap prompt secara berurutan."""
-    # Ambil driver dari antrian
-    driver = get_driver()
-
-    # Proses setiap prompt satu per satu
-    print(f"[*] Memproses prompt: {prompts}")
     try:
-        response = get_response(driver, prompts)
-        print(f"[Response]: {response}\n")
+        check_popup(DRIVER)
+        response = get_response(DRIVER, prompts)
+        # print(f"[++] Response: {response}\n\n")
+        return response
     except Exception as e:
         print(f"[Error]: {e}")
-
-    print("[*] Semua prompt selesai diproses.")
-
-
-# if __name__ == "__main__":
-#     # Daftar prompt untuk dijalankan
-#     prompts = [
-#         "Apa itu AI?",
-#     ]
-
-#     # Buka dan siapkan driver untuk tiap sesi
-#     open_chatgpt()  # Memulai session dan menambahkan driver ke queue
-
-#     # Tunggu beberapa detik agar driver siap
-#     time.sleep(5)
-
-#     # Jalankan proses utama
-#     runAI(prompts)
+    return {}

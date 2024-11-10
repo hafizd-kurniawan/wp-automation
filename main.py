@@ -2,8 +2,7 @@ from selenium import webdriver
 from pathlib import Path
 
 from src.porta_berita import Login, Template, Post
-from utility.json_storage import StorageArticle
-from src.kompas import Kompas
+from src.kompas_v2 import Kompas
 
 
 def main():
@@ -25,24 +24,10 @@ def main():
     #     p = Post(driver)
     #     p.add_post()
 
-    driver = webdriver.Chrome()
-    s = StorageArticle()
-    k = Kompas(driver, s)
-    k.scraping_kompas()
-    driver = k.get_driver()
-    data = s.get_data()
-
-    for d in data:
-        print("[*] Category:", d)
-        for article in data[d]["articles"]:
-            link = article["link"]
-            index = article["index"]
-            content = k.get_article(link)
-
-            s.update_article(d, index, {"content": content})
-
-    path = Path.cwd() / "file.json"
-    k.write_to_json(data, path)
+    # article
+    path = Path.cwd() / "kompas_scraping.json"
+    k = Kompas(driver)
+    k.start_request()
 
 
 main()
